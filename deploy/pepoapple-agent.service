@@ -1,0 +1,15 @@
+[Unit]
+Description=Pepoapple Node Agent
+After=network.target
+
+[Service]
+Type=simple
+Environment=AGENT_API_BASE_URL=http://127.0.0.1:8080
+Environment=AGENT_NODE_TOKEN=change-me
+Environment=AGENT_HEARTBEAT_INTERVAL_SEC=15
+ExecStart=/usr/local/bin/pepoapple-agent
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
