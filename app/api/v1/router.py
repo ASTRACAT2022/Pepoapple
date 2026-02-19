@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     analytics,
+    audit,
     auth,
     backup,
     billing,
@@ -32,6 +33,7 @@ api_router.include_router(webhooks.router)
 api_router.include_router(reseller.router)
 api_router.include_router(backup.router)
 api_router.include_router(analytics.router)
+api_router.include_router(audit.router)
 
 agent_router = APIRouter()
 agent_router.include_router(nodes.agent_router)

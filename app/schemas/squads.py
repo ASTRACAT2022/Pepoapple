@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -38,5 +41,9 @@ class ServerResponse(BaseModel):
     region: str
     squad_id: str
     status: str
+    price: float
+    currency: str
+    next_due_at: Optional[datetime]
+    infra_status: str
 
     model_config = {"from_attributes": True}

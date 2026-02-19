@@ -60,8 +60,18 @@ Proxy Manager + Client Billing Platform with AWG2/Sing-box support and zero-touc
 - Backup registry in DB
 
 ### Frontend
-- Next.js + TypeScript + Tailwind admin UI scaffold
-- Sections for Dashboard, Users, Squads, Nodes, Servers, Protocols, Billing, Audit, Settings, Migration
+- Next.js + TypeScript + Tailwind admin UI with real API integration
+- Functional sections:
+  - Dashboard (health, analytics, node state)
+  - Users (create, block, limits, assign squad, rotate keys, reset devices/subscription)
+  - Squads/Servers (create and list)
+  - Nodes (create, push desired config, rollback, offline check)
+  - Client Billing (plans, orders, payment confirm)
+  - Infra Billing (provider cost + due records)
+  - Protocols (create/list protocol profiles)
+  - Migration (dry-run/apply/verify + legacy map)
+  - Audit (log viewer)
+  - Settings (auth mode, bootstrap/login, API keys, webhooks, backups)
 - Light/dark adaptation
 
 ### Node Agent (Go)

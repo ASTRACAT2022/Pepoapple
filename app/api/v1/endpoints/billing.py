@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Order, OrderStatus, Plan, User
+from app.models import Order, OrderStatus, Payment, Plan, User
 from app.schemas.billing import (
     OrderCreate,
     OrderResponse,
@@ -81,3 +81,13 @@ def get_order(order_id: str, db: Session = Depends(get_db)) -> Order:
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order_not_found")
     return order
+
+
+@router.get("/orders", response_model=list[OrderResponse], dependencies=[Depends(require_scopes("billing.read"))])
+def list_orders(limit: int = 100, db: Session = Depends(get_db)) -> list[Order]:
+    return db.scalars(select(Order).order_by(Order.created_at.desc()).limit(limit)).all()
+
+
+@router.get("/payments", response_model=list[PaymentResponse], dependencies=[Depends(require_scopes("billing.read"))])
+def list_payments(limit: int = 100, db: Session = Depends(get_db)) -> list[Payment]:
+    return db.scalars(select(Payment).order_by(Payment.created_at.desc()).limit(limit)).all()

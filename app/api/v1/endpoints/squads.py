@@ -46,6 +46,11 @@ def create_server(payload: ServerCreate, db: Session = Depends(get_db)) -> Serve
     return server
 
 
+@router.get("/servers", response_model=list[ServerResponse], dependencies=[Depends(require_scopes("users.read"))])
+def list_servers(db: Session = Depends(get_db)) -> list[Server]:
+    return db.scalars(select(Server).order_by(Server.host.asc())).all()
+
+
 @router.get("/squads/{squad_id}/servers", response_model=list[ServerResponse], dependencies=[Depends(require_scopes("users.read"))])
 def list_squad_servers(squad_id: str, db: Session = Depends(get_db)) -> list[Server]:
     squad = db.get(Squad, squad_id)

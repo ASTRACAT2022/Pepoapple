@@ -17,8 +17,14 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
     backup_dir: str = "./backups"
     webhook_timeout_seconds: int = 5
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    def cors_origins(self) -> list[str]:
+        if self.cors_allow_origins.strip() == "*":
+            return ["*"]
+        return [item.strip() for item in self.cors_allow_origins.split(",") if item.strip()]
 
 
 @lru_cache(maxsize=1)

@@ -52,3 +52,84 @@ body {
 .animate-rise {
   animation: rise 0.55s ease forwards;
 }
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(16, 17, 19, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.textarea {
+  min-height: 110px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: 2px solid rgba(247, 176, 43, 0.45);
+  outline-offset: 1px;
+}
+
+.btn {
+  border-radius: 0.65rem;
+  background: var(--ink);
+  color: #f4f0e6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 0.85rem;
+  transition: filter 0.2s ease;
+}
+
+.btn:hover {
+  filter: brightness(1.12);
+}
+
+.btn-secondary {
+  border-radius: 0.65rem;
+  background: rgba(16, 17, 19, 0.08);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 0.85rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.77rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(16, 17, 19, 0.62);
+  margin-bottom: 0.2rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid rgba(16, 17, 19, 0.08);
+  padding: 0.55rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(16, 17, 19, 0.55);
+}
