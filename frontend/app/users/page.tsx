@@ -51,6 +51,7 @@ export default function UsersPage() {
   const [squads, setSquads] = useState<SquadItem[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [devices, setDevices] = useState<DeviceItem[]>([]);
+  const [subscriptionLinks, setSubscriptionLinks] = useState<Record<string, string>>({});
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +104,14 @@ export default function UsersPage() {
     }
   }, []);
 
+  const loadSubscriptionLinks = useCallback(async (identifier: string) => {
+    try {
+      setSubscriptionLinks(await apiRequest<Record<string, string>>(`/api/v1/subscriptions/${identifier}/links`));
+    } catch {
+      setSubscriptionLinks({});
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -118,9 +127,10 @@ export default function UsersPage() {
           max_devices: String(user.max_devices),
         });
         setAssignSquadId(user.squad_id ?? "");
+        void loadSubscriptionLinks(user.subscription_token);
       }
     }
-  }, [selectedUserId, users, loadDevices]);
+  }, [selectedUserId, users, loadDevices, loadSubscriptionLinks]);
 
   async function runAction(action: () => Promise<void>, successMessage: string) {
     setError(null);
@@ -447,6 +457,26 @@ export default function UsersPage() {
                     </div>
                   ))}
                   {devices.length === 0 ? <p className="text-xs text-black/55">No registered devices.</p> : null}
+                </div>
+              </div>
+
+              <div>
+                <p className="label">Subscription Links</p>
+                <div className="space-y-1">
+                  {Object.entries(subscriptionLinks).map(([name, url]) => (
+                    <div key={name} className="rounded-lg border border-black/10 px-3 py-2 text-xs">
+                      <p className="font-medium">{name}</p>
+                      <p className="font-mono break-all text-black/60">{url}</p>
+                    </div>
+                  ))}
+                  {Object.keys(subscriptionLinks).length === 0 ? (
+                    <p className="text-xs text-black/55">No links generated.</p>
+                  ) : null}
+                  {selectedUser ? (
+                    <p className="text-xs text-black/55">
+                      Public page (separate service): <span className="font-mono">http://localhost:3010/{selectedUser.short_id}</span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>

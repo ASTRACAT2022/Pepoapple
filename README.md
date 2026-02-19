@@ -76,9 +76,13 @@ Proxy Manager + Client Billing Platform with AWG2/Sing-box support and zero-touc
 
 ### Node Agent (Go)
 - Poll desired config
-- Validate + apply + rollback config
+- Apply only when desired revision is newer than applied revision
+- Validate + atomic apply + rollback config
 - Heartbeat and apply result reporting
-- Systemd restart hooks for `awg2` and `sing-box`
+- Runtime modes:
+  - Docker/process supervision (default)
+  - systemd mode
+- Runtime engines: `Sing-box + AWG2` (no Xray)
 
 ## Repository Layout
 
@@ -104,8 +108,11 @@ INSTALL_DIR=$HOME/Pepoapple \
 API_BASE_URL=https://api.example.com \
 ADMIN_USER=root \
 ADMIN_PASSWORD='StrongPass123!' \
+INSTALL_DEMO_NODES=0 \
 bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
 ```
+
+macOS is supported without Docker Desktop (installer uses `colima`).
 
 ## Run Backend (Local)
 
@@ -143,12 +150,53 @@ make docker-up
 - Backend: `http://localhost:8080`
 - GraphQL: `http://localhost:8080/graphql`
 - Frontend: `http://localhost:3000`
-- Node Agents in Docker: `node-agent-1`, `node-agent-2`
+- Optional bundled subscription page: `http://localhost:3010/<token_or_short_id>`
 
-What Compose now does automatically:
-- starts `db`, `redis`, `api`, `frontend`
-- runs `seed` once to create demo squad/servers/nodes
-- starts 2 node-agent containers connected to API
+Default compose starts:
+- `db`, `redis`, `api`, `frontend`, `subscription-page`
+
+Demo profile additionally starts:
+- `seed`, `node-agent-1`, `node-agent-2`
+
+Start with demo profile:
+
+```bash
+docker compose --profile demo up -d --build
+```
+
+## Separate Node Install
+
+Install one node agent per remote server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-node.sh -o install-node.sh
+chmod +x install-node.sh
+AGENT_API_BASE_URL='https://api.example.com' AGENT_NODE_TOKEN='<node_token>' ./install-node.sh
+```
+
+Bulk install over SSH:
+
+```bash
+./scripts/install-nodes-ssh.sh https://api.example.com root ./nodes.csv
+```
+
+`nodes.csv` format:
+
+```text
+host,node_token
+1.2.3.4,node-1-token
+5.6.7.8,node-2-token
+```
+
+## Separate Subscription Page
+
+Deploy subscription-page on another server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-subpage.sh -o install-subpage.sh
+chmod +x install-subpage.sh
+PANEL_API_BASE_URL='https://api.example.com' CUSTOM_SUB_PREFIX='' ./install-subpage.sh
+```
 
 ## Auth Bootstrap
 
@@ -188,6 +236,12 @@ Check agents/API logs:
 docker compose logs -f api node-agent-1 node-agent-2
 ```
 
+Node-only host logs:
+
+```bash
+docker compose -f docker-compose.node.yml --env-file .env.node logs -f node-agent
+```
+
 ## SQL Scripts
 
 - `sql/001_init.sql` - base MVP schema
@@ -206,5 +260,6 @@ docker compose logs -f api node-agent-1 node-agent-2
 - Migration: `/api/v1/migration/*`
 - Backups: `/api/v1/backups/*`
 - Analytics: `/api/v1/analytics/overview`
-- Subscription compatibility: `/api/v1/subscriptions/{token}`
+- Subscription compatibility: `/api/v1/subscriptions/{token_or_short_id}`
+- Subscription page inside API (optional): `/api/v1/sub/{token_or_short_id}`
 - GraphQL: `/graphql`

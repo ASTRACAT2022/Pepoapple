@@ -48,4 +48,7 @@ class AgentReportUsage(BaseModel):
 class DesiredConfigResponse(BaseModel):
     node_id: str
     desired_config_revision: int
+    applied_config_revision: int
+    engine_awg2_enabled: bool = True
+    engine_singbox_enabled: bool = True
     desired_config: dict

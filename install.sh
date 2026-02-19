@@ -5,9 +5,11 @@ REPO_URL="${REPO_URL:-https://github.com/ASTRACAT2022/Pepoapple.git}"
 BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/Pepoapple}"
 AUTO_INSTALL_DOCKER="${AUTO_INSTALL_DOCKER:-1}"
+INSTALL_DEMO_NODES="${INSTALL_DEMO_NODES:-0}"
 API_BASE_URL="${API_BASE_URL:-}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
+OS_NAME="$(uname -s)"
 
 GREEN="\033[0;32m"
 YELLOW="\033[0;33m"
@@ -33,6 +35,14 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+is_macos() {
+  [ "$OS_NAME" = "Darwin" ]
+}
+
+is_linux() {
+  [ "$OS_NAME" = "Linux" ]
+}
+
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -56,10 +66,17 @@ install_base_tools() {
     return
   fi
 
-  if [ -f /etc/debian_version ]; then
+  if is_linux && [ -f /etc/debian_version ]; then
     log_info "Installing missing tools: ${missing[*]}"
     run_as_root apt-get update
     run_as_root apt-get install -y "${missing[@]}"
+  elif is_macos; then
+    if ! need_cmd brew; then
+      log_error "Homebrew is required on macOS. Install it first: https://brew.sh"
+      exit 1
+    fi
+    log_info "Installing missing tools with Homebrew: ${missing[*]}"
+    brew install "${missing[@]}"
   else
     log_error "Missing required tools (${missing[*]}). Install them and rerun installer."
     exit 1
@@ -76,13 +93,24 @@ install_docker_if_needed() {
     exit 1
   fi
 
-  if [ ! -f /etc/os-release ]; then
-    log_error "Cannot detect OS. Install Docker manually and rerun installer."
-    exit 1
+  if is_macos; then
+    if ! need_cmd brew; then
+      log_error "Homebrew is required on macOS. Install it first: https://brew.sh"
+      exit 1
+    fi
+    log_info "Installing Docker CLI + Colima via Homebrew..."
+    brew install docker docker-compose colima
+    return
   fi
 
-  log_info "Docker not found. Installing Docker Engine via official script..."
-  curl -fsSL https://get.docker.com | run_as_root sh
+  if is_linux && [ -f /etc/os-release ]; then
+    log_info "Docker not found. Installing Docker Engine via official script..."
+    curl -fsSL https://get.docker.com | run_as_root sh
+    return
+  fi
+
+  log_error "Cannot auto-install Docker on this OS. Install Docker manually and rerun installer."
+  exit 1
 }
 
 ensure_compose() {
@@ -90,10 +118,13 @@ ensure_compose() {
     return
   fi
 
-  if [ -f /etc/debian_version ]; then
+  if is_linux && [ -f /etc/debian_version ]; then
     log_info "Installing docker compose plugin..."
     run_as_root apt-get update
     run_as_root apt-get install -y docker-compose-plugin
+  elif is_macos && need_cmd brew; then
+    log_info "Installing docker-compose plugin/binary via Homebrew..."
+    brew install docker-compose
   fi
 
   if ! docker compose version >/dev/null 2>&1; then
@@ -106,6 +137,17 @@ configure_docker_cmd() {
   if docker info >/dev/null 2>&1; then
     DOCKER_CMD=(docker)
     return
+  fi
+
+  if is_macos && need_cmd colima; then
+    log_info "Starting Colima Docker runtime..."
+    if ! colima status >/dev/null 2>&1; then
+      colima start
+    fi
+    if docker info >/dev/null 2>&1; then
+      DOCKER_CMD=(docker)
+      return
+    fi
   fi
 
   if need_cmd sudo && sudo docker info >/dev/null 2>&1; then
@@ -204,10 +246,17 @@ init_env_file() {
 
 compose_up() {
   log_info "Starting docker stack..."
-  (
-    cd "$INSTALL_DIR"
-    "${DOCKER_CMD[@]}" compose up -d --build
-  )
+  if [ "$INSTALL_DEMO_NODES" = "1" ]; then
+    (
+      cd "$INSTALL_DIR"
+      "${DOCKER_CMD[@]}" compose --profile demo up -d --build
+    )
+  else
+    (
+      cd "$INSTALL_DIR"
+      "${DOCKER_CMD[@]}" compose up -d --build
+    )
+  fi
 }
 
 wait_api_health() {
@@ -269,10 +318,17 @@ Endpoints:
 - Panel: $panel_url
 - API: $api_url
 - GraphQL: $api_url/graphql
+- Subscription page: http://localhost:3010/<token_or_short_id>
 
 Docker:
 - Check status: cd $INSTALL_DIR && ${DOCKER_CMD[*]} compose ps
-- Logs: cd $INSTALL_DIR && ${DOCKER_CMD[*]} compose logs -f api frontend node-agent-1 node-agent-2
+- Logs: cd $INSTALL_DIR && ${DOCKER_CMD[*]} compose logs -f api frontend subscription-page
+
+Node agents on separate servers:
+- Run per node server:
+  curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-node.sh -o install-node.sh
+  chmod +x install-node.sh
+  AGENT_API_BASE_URL='$api_url' AGENT_NODE_TOKEN='<node_token>' ./install-node.sh
 EOF_SUMMARY
 
   if [ -n "$GENERATED_ADMIN_PASSWORD" ]; then

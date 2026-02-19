@@ -33,6 +33,7 @@ export default function NodesPage() {
   });
   const [configJson, setConfigJson] = useState('{"inbounds": []}');
   const [rollbackRevision, setRollbackRevision] = useState("");
+  const [installCommand, setInstallCommand] = useState("");
 
   const selectedNode = useMemo(() => nodes.find((item) => item.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
 
@@ -60,6 +61,9 @@ export default function NodesPage() {
   useEffect(() => {
     if (selectedNode) {
       setConfigJson(prettyJson({ inbounds: [] }));
+      void apiRequest<{ install_command: string }>(`/api/v1/nodes/${selectedNode.id}/install`)
+        .then((data) => setInstallCommand(data.install_command))
+        .catch(() => setInstallCommand(""));
     }
   }, [selectedNode]);
 
@@ -161,6 +165,25 @@ export default function NodesPage() {
                 <p>
                   Revision: {selectedNode.applied_config_revision}/{selectedNode.desired_config_revision}
                 </p>
+                <p className="font-mono text-xs text-black/60">Token: {selectedNode.node_token}</p>
+              </div>
+
+              <div>
+                <label className="label">Install Command (remote server)</label>
+                <textarea className="textarea" value={installCommand} readOnly />
+                <button
+                  className="btn mt-2"
+                  type="button"
+                  onClick={() => {
+                    if (installCommand && navigator?.clipboard) {
+                      void navigator.clipboard.writeText(installCommand);
+                      setSuccess("Install command copied");
+                    }
+                  }}
+                  disabled={!installCommand}
+                >
+                  Copy Command
+                </button>
               </div>
 
               <div>

@@ -1,0 +1,27 @@
+services:
+  node-agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    environment:
+      AGENT_API_BASE_URL: ${AGENT_API_BASE_URL:-https://api.example.com}
+      AGENT_NODE_TOKEN: ${AGENT_NODE_TOKEN:-change-me}
+      AGENT_HEARTBEAT_INTERVAL_SEC: ${AGENT_HEARTBEAT_INTERVAL_SEC:-15}
+      AGENT_RUNTIME_MODE: ${AGENT_RUNTIME_MODE:-process}
+      AGENT_DESIRED_PATH: /data/desired.json
+      AGENT_CONFIG_PATH: /data/runtime.json
+      AGENT_BACKUP_PATH: /data/runtime.backup.json
+      AGENT_SINGBOX_CONFIG_PATH: /data/singbox.json
+      AGENT_SINGBOX_BACKUP_PATH: /data/singbox.backup.json
+      AGENT_SINGBOX_PID_PATH: /data/singbox.pid
+      AGENT_SINGBOX_RUN_COMMAND: ${AGENT_SINGBOX_RUN_COMMAND:-sing-box run -D /data -c /data/singbox.json}
+      AGENT_AWG2_CONFIG_PATH: /data/awg2.json
+      AGENT_AWG2_BACKUP_PATH: /data/awg2.backup.json
+      AGENT_AWG2_PID_PATH: /data/awg2.pid
+      AGENT_AWG2_RUN_COMMAND: ${AGENT_AWG2_RUN_COMMAND:-awg2 -f wg0}
+    volumes:
+      - node-agent-data:/data
+    restart: unless-stopped
+
+volumes:
+  node-agent-data:

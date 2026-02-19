@@ -1,40 +1,66 @@
 # Pepoapple Deployment Manual
 
-This guide covers production deployment of Pepoapple (API + Frontend + PostgreSQL + Redis + Node Agents) using Docker Compose.
+This guide covers production deployment of Pepoapple with:
+- panel/API in Docker
+- node agents on separate servers
+- optional separate subscription page (Remnawave-style)
+- macOS test deployment without Docker Desktop
 
-## 1. Architecture
+## 1. Topology
 
-Services:
-- `api` - FastAPI backend (`:8080`)
-- `frontend` - Next.js admin panel (`:3000`)
-- `db` - PostgreSQL 16
-- `redis` - Redis 7
-- `seed` - one-time demo data bootstrap
-- `node-agent-1`, `node-agent-2` - Go node agents connected to API
+Recommended production topology:
+- `panel host`: `api`, `frontend`, `postgres`, `redis`, optional `subscription-page`
+- `node hosts`: one `node-agent` per server
+- reverse proxy/TLS in front of panel and subpage
 
-Persistent volumes:
-- `pgdata` - PostgreSQL data
-- `backups` - exported backup snapshots
-- `agent1-data`, `agent2-data` - agent runtime/config data
+Ports:
+- `3000` frontend
+- `8080` API
+- `3010` subscription-page (optional)
+- `5432` Postgres (keep private)
+- `6379` Redis (keep private)
 
 ## 2. Prerequisites
 
-On target server:
-- Linux host with Docker Engine 24+
+Linux:
+- Docker Engine 24+
 - Docker Compose v2+
-- 2 CPU / 4 GB RAM minimum
-- Open ports:
-  - `80` and `443` (reverse proxy)
-  - `8080` (optional direct API access)
-  - `3000` (optional direct frontend access)
+- Git, curl
 
-Recommended:
-- separate reverse proxy (Nginx/Caddy/Traefik)
-- domain names:
-  - `panel.example.com` -> frontend
-  - `api.example.com` -> API
+macOS (without Docker Desktop):
+- Homebrew
+- `docker` CLI + `colima` (installer can set this up automatically)
 
-## 3. Clone and Prepare
+## 3. Quick Install (Panel Host)
+
+One command:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
+```
+
+Useful overrides:
+
+```bash
+INSTALL_DIR=/opt/pepoapple \
+API_BASE_URL=https://api.example.com \
+ADMIN_USER=admin \
+ADMIN_PASSWORD='StrongPass123!' \
+INSTALL_DEMO_NODES=0 \
+AUTO_INSTALL_DOCKER=1 \
+bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
+```
+
+What it does:
+- installs missing dependencies
+- installs Docker (or Docker+Colima on macOS)
+- clones/updates repo
+- creates `.env`
+- starts stack
+- waits for API health
+- bootstraps first admin
+
+## 4. Manual Start (Panel Host)
 
 ```bash
 git clone https://github.com/ASTRACAT2022/Pepoapple.git
@@ -42,233 +68,161 @@ cd Pepoapple
 cp .env.example .env
 ```
 
-Fast path (automatic installer):
+Edit `.env`:
+- `JWT_SECRET`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `PUBLIC_API_BASE_URL`
+- optional: `SUBPAGE_*`
+
+Start base stack (without demo node containers):
+
+```bash
+docker compose up -d --build
+```
+
+Start with local demo node containers too:
+
+```bash
+docker compose --profile demo up -d --build
+```
+
+## 5. Separate Node Installation (Per Server)
+
+Create node in panel (`Nodes`), copy node token, then run on each node server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-node.sh -o install-node.sh
+chmod +x install-node.sh
+AGENT_API_BASE_URL='https://api.example.com' AGENT_NODE_TOKEN='<node_token>' ./install-node.sh
+```
+
+Batch install over SSH:
+
+```bash
+./scripts/install-nodes-ssh.sh https://api.example.com root ./nodes.csv
+```
+
+`nodes.csv` format:
+
+```text
+1.2.3.4,node-token-1
+5.6.7.8,node-token-2
+```
+
+Agent runtime notes:
+- runtime is `Sing-box + AWG2` (no Xray)
+- agent applies only new config revisions
+- atomic apply + rollback
+- per-engine config files stored in node volume
+
+## 6. Subscription Page (Remnawave-style)
+
+### Option A: bundled (same host)
+Already included in main `docker-compose.yml` as service `subscription-page`.
+
+URL example:
+- `http://sub.example.com/<token_or_short_id>`
+
+### Option B: separate server
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-subpage.sh -o install-subpage.sh
+chmod +x install-subpage.sh
+PANEL_API_BASE_URL='https://api.example.com' \
+CUSTOM_SUB_PREFIX='' \
+./install-subpage.sh
+```
+
+Supported envs:
+- `PANEL_API_BASE_URL`
+- `PAGE_TITLE`
+- `SUPPORT_URL`
+- `SHOW_RAW_LINKS=true|false`
+- `CUSTOM_SUB_PREFIX` (like Remnawave custom sub path)
+
+## 7. macOS Test Deploy (No Docker Desktop)
+
+Run installer directly on macOS:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
 ```
 
-Installer supports optional overrides:
-- `INSTALL_DIR`
-- `API_BASE_URL`
-- `ADMIN_USER`
-- `ADMIN_PASSWORD`
-- `AUTO_INSTALL_DOCKER` (`1` or `0`)
+Installer will:
+- install `docker`, `docker-compose`, `colima` via Homebrew (if missing)
+- start Colima automatically
+- start Pepoapple stack
 
-## 4. Environment Configuration
+If Homebrew is missing, install from [brew.sh](https://brew.sh) first.
 
-Edit `.env` before first start:
+## 8. Validation Checklist
 
-Mandatory:
-- `JWT_SECRET` - set a long random secret (32+ chars)
-- `DOCKER_DATABASE_URL` - keep default unless custom DB host
-- `DOCKER_REDIS_URL` - keep default unless custom Redis host
-- `NEXT_PUBLIC_API_BASE_URL` - public API URL (e.g. `https://api.example.com`)
-
-Node/seed:
-- `SEED_SQUAD_NAME`
-- `NODE_1_TOKEN`
-- `NODE_2_TOKEN`
-- `AGENT_HEARTBEAT_INTERVAL_SEC`
-
-Security hardening:
-- do not use default secrets/tokens in production
-- restrict public access to DB/Redis ports (5432/6379)
-
-## 5. Start Full Stack
+Health:
 
 ```bash
-docker compose up -d --build
+curl -fsS http://localhost:8080/api/v1/health
 ```
 
-Check status:
-
-```bash
-docker compose ps
-```
-
-Check logs:
-
-```bash
-docker compose logs -f api frontend node-agent-1 node-agent-2
-```
-
-## 6. Bootstrap Admin
-
-Create first super-admin once:
+Bootstrap/login:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/bootstrap \
   -H 'Content-Type: application/json' \
-  -d '{"username":"root","password":"CHANGE_ME_STRONG_PASSWORD"}'
+  -d '{"username":"admin","password":"StrongPass123!"}'
 ```
 
-If API is behind TLS domain:
+Subscription compatibility:
 
 ```bash
-curl -X POST https://api.example.com/api/v1/auth/bootstrap \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"root","password":"CHANGE_ME_STRONG_PASSWORD"}'
+curl -fsS http://localhost:8080/api/v1/subscriptions/<token_or_short_id>
 ```
 
-## 7. Post-Deploy Validation Checklist
-
-Health:
-```bash
-curl http://localhost:8080/api/v1/health
-```
-
-GraphQL:
-```bash
-curl -X POST http://localhost:8080/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"{ users { id } }"}'
-```
-
-Frontend:
-- open `http://SERVER_IP:3000`
-
-Agents:
-- verify node heartbeat in logs:
-```bash
-docker compose logs -f node-agent-1 node-agent-2
-```
-
-DB connectivity:
-```bash
-docker compose exec db psql -U pepoapple -d pepoapple -c '\dt'
-```
-
-## 8. Reverse Proxy (Nginx Example)
-
-Example `/etc/nginx/conf.d/pepoapple.conf`:
-
-```nginx
-server {
-  listen 80;
-  server_name panel.example.com;
-
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
-
-server {
-  listen 80;
-  server_name api.example.com;
-
-  location / {
-    proxy_pass http://127.0.0.1:8080;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
-```
-
-Then enable TLS (Certbot or Caddy).
-
-## 9. Backups and Restore
-
-Run backup via API:
+Node heartbeat/apply:
+- check `Nodes` page status
+- check node logs:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/backups/run \
-  -H 'X-Scopes: *' \
-  -H 'Content-Type: application/json' \
-  -d '{"storage_type":"local"}'
+docker compose -f docker-compose.node.yml --env-file .env.node logs -f node-agent
 ```
 
-Backup files are in Docker volume mounted to `/app/backups` inside API container.
+## 9. Upgrade
 
-Manual DB backup:
-
-```bash
-docker compose exec db pg_dump -U pepoapple pepoapple > pepoapple_db_$(date +%F).sql
-```
-
-Restore DB:
+Panel host:
 
 ```bash
-cat pepoapple_db_YYYY-MM-DD.sql | docker compose exec -T db psql -U pepoapple -d pepoapple
-```
-
-## 10. Upgrade Procedure
-
-1. Pull latest code:
-```bash
+cd /opt/pepoapple
 git pull
-```
-
-2. Rebuild and restart:
-```bash
 docker compose up -d --build
 ```
 
-3. Verify health/logs:
+Node hosts:
+
 ```bash
-docker compose ps
-docker compose logs --tail=200 api
+cd /opt/pepoapple-node
+git pull
+docker compose -f docker-compose.node.yml --env-file .env.node up -d --build
 ```
 
-## 11. Scaling Node Agents
+## 10. Troubleshooting
 
-To add more node agents:
-1. Add unique token in `.env` (e.g. `NODE_3_TOKEN`)
-2. Duplicate `node-agent-*` service in `docker-compose.yml`
-3. Seed/register matching node in API (via seed script update or REST call)
-4. `docker compose up -d --build`
+Frontend build error `Can't resolve ../../lib/api`:
+- fixed in current code (`frontend/lib` copied in Dockerfile)
 
-## 12. Production Hardening
+`docker compose` warns about `version` key:
+- removed in current compose files
 
-- Put API and frontend behind TLS only
-- Block direct public access to DB/Redis ports
-- Rotate JWT/API key secrets periodically
-- Replace `X-Scopes: *` usage with real JWT/API keys
-- Enable centralized logs (Loki/ELK) and metrics (Prometheus/Grafana)
-- Add external uptime checks for `/api/v1/health`
-- Use firewall and fail2ban
+Node stays `offline`:
+- verify `AGENT_NODE_TOKEN`
+- verify API reachability from node host
+- check node service logs
 
-## 13. Troubleshooting
+Config apply failed:
+- verify desired config JSON
+- ensure at least one engine config exists (`singbox` or root sing-box fields, and/or `awg2`)
+- agent will rollback previous config on failure
 
-API cannot connect to DB:
-- check `DOCKER_DATABASE_URL` in `.env`
-- check `docker compose logs db api`
-
-Frontend cannot call API:
-- check `NEXT_PUBLIC_API_BASE_URL`
-- check reverse proxy upstream and CORS/network
-
-Agents offline:
-- verify tokens match seeded node tokens
-- check agent logs
-- ensure API is reachable from Docker network (`http://api:8080`)
-
-Auth bootstrap conflict:
-- means admin already exists (`bootstrap_already_completed`)
-- use `/api/v1/auth/login`
-
-## 14. Useful Commands
-
-Start stack:
-```bash
-docker compose up -d --build
-```
-
-Stop stack:
-```bash
-docker compose down
-```
-
-Stop + remove volumes (danger: data loss):
-```bash
-docker compose down -v
-```
-
-Run backend tests locally:
-```bash
-python3 -m pytest -q
-```
+AWG2 binary/runtime issues:
+- set custom env in node `.env.node`:
+  - `AGENT_AWG2_RUN_COMMAND`
+  - `AGENT_AWG2_VERSION_COMMAND`
+- restart node agent container

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import ConfigRevision, ConfigRevisionStatus, Node, NodeStatus, Server
 from app.schemas.nodes import (
@@ -23,6 +24,7 @@ from app.services.webhooks import enqueue_event
 
 admin_router = APIRouter(prefix="/nodes", tags=["nodes"])
 agent_router = APIRouter(prefix="/agent", tags=["agent"])
+settings = get_settings()
 
 
 @admin_router.post("", response_model=NodeResponse, dependencies=[Depends(require_scopes("nodes.control"))])
@@ -50,6 +52,26 @@ def list_nodes(status_filter: Optional[str] = None, db: Session = Depends(get_db
     if status_filter:
         query = query.where(Node.status == status_filter)
     return db.scalars(query.order_by(Node.last_seen_at.desc().nullslast())).all()
+
+
+@admin_router.get("/{node_id}/install", dependencies=[Depends(require_scopes("nodes.control"))])
+def node_install_instructions(node_id: str, db: Session = Depends(get_db)) -> dict:
+    node = db.get(Node, node_id)
+    if not node:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="node_not_found")
+
+    install_command = (
+        "curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install-node.sh -o install-node.sh "
+        "&& chmod +x install-node.sh "
+        f"&& AGENT_API_BASE_URL='{settings.public_api_base_url}' AGENT_NODE_TOKEN='{node.node_token}' ./install-node.sh"
+    )
+    return {
+        "node_id": node.id,
+        "server_id": node.server_id,
+        "node_token": node.node_token,
+        "agent_api_base_url": settings.public_api_base_url,
+        "install_command": install_command,
+    }
 
 
 @admin_router.post("/check-offline", dependencies=[Depends(require_scopes("nodes.control"))])
@@ -167,6 +189,9 @@ def desired_config(node_token: str = Query(...), db: Session = Depends(get_db)) 
     return DesiredConfigResponse(
         node_id=node.id,
         desired_config_revision=node.desired_config_revision,
+        applied_config_revision=node.applied_config_revision,
+        engine_awg2_enabled=node.engine_awg2_enabled,
+        engine_singbox_enabled=node.engine_singbox_enabled,
         desired_config=node.desired_config,
     )
 

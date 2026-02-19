@@ -14,7 +14,7 @@ from app.models import (
     SubscriptionAlias,
     User,
 )
-from app.services.subscription import build_subscription_payload, resolve_user_by_subscription_token
+from app.services.subscription import build_subscription_payload, resolve_user_by_subscription_identifier
 
 
 def _dry_run(db: Session, payload: dict) -> dict:
@@ -131,7 +131,7 @@ def _verify(db: Session, payload: dict) -> dict:
         status = "ok"
         reason = ""
         try:
-            user = resolve_user_by_subscription_token(db, token)
+            user = resolve_user_by_subscription_identifier(db, token)
             subscription = build_subscription_payload(db, user)
             if not isinstance(subscription.get("endpoints", []), list):
                 status = "failed"

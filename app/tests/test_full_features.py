@@ -151,3 +151,59 @@ def test_migration_modes_and_graphql(client, admin_headers):
     gql = client.post("/graphql", json={"query": "{ users { id uuid } }"})
     assert gql.status_code == 200
     assert "data" in gql.json()
+
+
+def test_agent_desired_config_and_install_instructions(client, admin_headers):
+    squad_resp = client.post(
+        "/api/v1/squads",
+        json={
+            "name": "NODE-S1",
+            "description": "",
+            "selection_policy": "round-robin",
+            "fallback_policy": "none",
+            "allowed_protocols": ["AWG2", "Sing-box"],
+        },
+        headers=admin_headers,
+    )
+    assert squad_resp.status_code == 200
+    squad_id = squad_resp.json()["id"]
+
+    server_resp = client.post(
+        "/api/v1/servers",
+        json={
+            "host": "node-api.example.com",
+            "ip": "10.1.1.10",
+            "provider": "test",
+            "region": "eu",
+            "squad_id": squad_id,
+            "price": 1.0,
+            "currency": "USD",
+        },
+        headers=admin_headers,
+    )
+    assert server_resp.status_code == 200
+
+    node_resp = client.post(
+        "/api/v1/nodes",
+        json={
+            "server_id": server_resp.json()["id"],
+            "node_token": "agent-token-install",
+            "engine_awg2_enabled": True,
+            "engine_singbox_enabled": True,
+            "desired_config": {"inbounds": []},
+        },
+        headers=admin_headers,
+    )
+    assert node_resp.status_code == 200
+    node_id = node_resp.json()["id"]
+
+    desired_resp = client.get("/agent/desired-config", params={"node_token": "agent-token-install"})
+    assert desired_resp.status_code == 200
+    desired_payload = desired_resp.json()
+    assert desired_payload["applied_config_revision"] == 0
+    assert desired_payload["engine_awg2_enabled"] is True
+    assert desired_payload["engine_singbox_enabled"] is True
+
+    install_resp = client.get(f"/api/v1/nodes/{node_id}/install", headers=admin_headers)
+    assert install_resp.status_code == 200
+    assert "AGENT_NODE_TOKEN='agent-token-install'" in install_resp.json()["install_command"]
