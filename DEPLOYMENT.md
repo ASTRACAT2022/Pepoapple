@@ -42,6 +42,19 @@ cd Pepoapple
 cp .env.example .env
 ```
 
+Fast path (automatic installer):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
+```
+
+Installer supports optional overrides:
+- `INSTALL_DIR`
+- `API_BASE_URL`
+- `ADMIN_USER`
+- `ADMIN_PASSWORD`
+- `AUTO_INSTALL_DOCKER` (`1` or `0`)
+
 ## 4. Environment Configuration
 
 Edit `.env` before first start:

@@ -77,6 +77,25 @@ Proxy Manager + Client Billing Platform with AWG2/Sing-box support and zero-touc
 - `agent/` Go node agent
 - `frontend/` Next.js admin panel
 - `deploy/` systemd unit examples
+- `install.sh` one-command installer
+
+## Easy Installer
+
+One command install/update:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
+```
+
+Optional installer env overrides:
+
+```bash
+INSTALL_DIR=$HOME/Pepoapple \
+API_BASE_URL=https://api.example.com \
+ADMIN_USER=root \
+ADMIN_PASSWORD='StrongPass123!' \
+bash <(curl -fsSL https://raw.githubusercontent.com/ASTRACAT2022/Pepoapple/main/install.sh)
+```
 
 ## Run Backend (Local)
 
